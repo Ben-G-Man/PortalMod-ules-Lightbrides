@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "facing=north": { "model": "lightbridges:block/bridge_emitter", "y": 180 },
+    "facing=south": { "model": "lightbridges:block/bridge_emitter" },
+    "facing=west":  { "model": "lightbridges:block/bridge_emitter", "y": 90 },
+    "facing=east":  { "model": "lightbridges:block/bridge_emitter", "y": 270 },
+    "facing=up":    { "model": "lightbridges:block/bridge_emitter", "x": 90 },
+    "facing=down":    { "model": "lightbridges:block/bridge_emitter", "x": 270}
+  }
+}

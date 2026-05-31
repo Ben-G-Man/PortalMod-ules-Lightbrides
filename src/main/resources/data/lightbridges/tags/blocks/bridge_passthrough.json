@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft:glass",
+    "minecraft:glass_pane",
+    "minecraft:iron_bars",
+    "minecraft:chain",
+    "lightbridges:bridge_emitter"
+  ]
+}
