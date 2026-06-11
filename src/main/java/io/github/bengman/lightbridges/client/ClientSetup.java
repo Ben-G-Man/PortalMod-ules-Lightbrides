@@ -16,6 +16,6 @@ public class ClientSetup {
 
         ClientRegistry.bindTileEntityRenderer(
                 LightBridges.EMITTER_TILE_ENTITY.get(),
-                LightBridgeRenderer::new);
+                BridgeRenderer::new);
     }
 }

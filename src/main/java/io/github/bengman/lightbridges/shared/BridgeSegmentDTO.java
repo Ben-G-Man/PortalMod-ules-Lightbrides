@@ -1,17 +1,18 @@
 package io.github.bengman.lightbridges.shared;
 
 import net.minecraft.nbt.CompoundNBT;
+import net.minecraft.util.Direction;
 import net.minecraft.util.math.vector.Vector3d;
 
 public class BridgeSegmentDTO {
     private Vector3d start;
     private Vector3d end;
-    private float roll;
+    private Direction up;
 
-    public BridgeSegmentDTO(Vector3d start, Vector3d end, float roll) {
+    public BridgeSegmentDTO(Vector3d start, Vector3d end, Direction up) {
         this.start = start;
         this.end = end;
-        this.roll = roll;
+        this.up = up;
     }
 
     public Vector3d getStart() {
@@ -22,8 +23,28 @@ public class BridgeSegmentDTO {
         return end;
     }
 
-    public float getRoll() {
-        return roll;
+    public Direction getUp() {
+        return up;
+    }
+
+    public Direction getDirection() {
+
+        Vector3d delta = end.subtract(start).normalize();
+
+        if (delta.x > 0.5)
+            return Direction.EAST;
+        if (delta.x < -0.5)
+            return Direction.WEST;
+
+        if (delta.y > 0.5)
+            return Direction.UP;
+        if (delta.y < -0.5)
+            return Direction.DOWN;
+
+        if (delta.z > 0.5)
+            return Direction.SOUTH;
+
+        return Direction.NORTH;
     }
 
     /* ---- Serialization ---- */
@@ -40,7 +61,7 @@ public class BridgeSegmentDTO {
         tag.putDouble("endY", end.y);
         tag.putDouble("endZ", end.z);
 
-        tag.putFloat("roll", roll);
+        tag.putInt("up", up.get3DDataValue()); // TODO: Fix client-server stuff
 
         return tag;
     }
@@ -58,8 +79,8 @@ public class BridgeSegmentDTO {
                 tag.getDouble("endY"),
                 tag.getDouble("endZ"));
 
-        float roll = tag.getFloat("roll");
+        Direction up = Direction.from3DDataValue(tag.getInt("up"));
 
-        return new BridgeSegmentDTO(start, end, roll);
+        return new BridgeSegmentDTO(start, end, up);
     }
 }

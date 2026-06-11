@@ -8,27 +8,21 @@ import net.minecraft.network.NetworkManager;
 import net.minecraft.network.play.server.SUpdateTileEntityPacket;
 import net.minecraft.tileentity.ITickableTileEntity;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.Direction;
 import net.minecraft.util.math.AxisAlignedBB;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.vector.Vector3d;
-import net.minecraft.util.math.vector.Vector3i;
-import net.minecraft.world.World;
 
-public class BridgeEmitterTileEntity
-        extends TileEntity
-        implements ITickableTileEntity {
+public class BridgeEmitterTileEntity extends TileEntity implements ITickableTileEntity {
 
     public boolean active;
     public Vector3d start;
-    public Vector3d direction;
-    public float roll = 0.0f;
+    public Direction direction;
+    public Direction up = Direction.UP;
 
-    // Used for rendering & collisions
     private BridgeDTO bridge;
 
     private boolean initialized = false;
 
-    // Server-side only, used for simulation & updates
     private LightBridgeSegment bridgeRoot;
 
     public BridgeEmitterTileEntity() {
@@ -36,11 +30,7 @@ public class BridgeEmitterTileEntity
     }
 
     public BridgeDTO getBridge() {
-        if (bridge == null) {
-            return new BridgeDTO();
-        }
-
-        return bridge;
+        return bridge == null ? new BridgeDTO() : bridge;
     }
 
     /* ---- Bridge Logic ---- */
@@ -56,8 +46,9 @@ public class BridgeEmitterTileEntity
         }
 
         if (!level.isClientSide) {
+
             if (bridgeRoot == null && active && initialized) {
-                bridgeRoot = new LightBridgeSegment(start, direction, roll);
+                bridgeRoot = new LightBridgeSegment(start, direction, up);
             }
 
             if (bridgeRoot != null && !active) {
@@ -66,10 +57,11 @@ public class BridgeEmitterTileEntity
             }
 
             if (bridgeRoot != null) {
+
                 BridgeDTO update = bridgeRoot.tick(level);
 
                 if (update != null) {
-                    this.bridge = update;
+                    bridge = update;
                     sync();
                 }
             }
@@ -84,22 +76,24 @@ public class BridgeEmitterTileEntity
 
         if (level.isClientSide) {
             return true;
-        } else {
-            BlockState state = level.getBlockState(worldPosition);
-            Vector3i dir = state.getValue(BridgeEmitterBlock.FACING).getNormal();
-
-            active = true;
-            start = Vector3d.atCenterOf(worldPosition);
-            direction = new Vector3d(
-                    dir.getX(),
-                    dir.getY(),
-                    dir.getZ()).normalize();
-            roll = 0.0f;
-
-            sync();
-
-            return true;
         }
+
+        BlockState state = level.getBlockState(worldPosition);
+
+        direction = state.getValue(BridgeEmitterBlock.FACING);
+
+        if (direction == Direction.DOWN || direction == Direction.UP) {
+            up = Direction.NORTH;
+        } else {
+            up = Direction.UP;
+        }
+
+        active = true;
+        start = Vector3d.atCenterOf(worldPosition);
+
+        sync();
+
+        return true;
     }
 
     /* ---- Cleanup ---- */
@@ -127,9 +121,10 @@ public class BridgeEmitterTileEntity
         }
     }
 
-    /* ---- Client-Server Synchronization ---- */
+    /* ---- Synchronization ---- */
 
     private void sync() {
+
         setChanged();
 
         BlockState state = getBlockState();
@@ -143,8 +138,6 @@ public class BridgeEmitterTileEntity
 
     private CompoundNBT writeEmitterData(CompoundNBT tag) {
 
-        /* ---- Basic State Data ---- */
-
         tag.putBoolean("active", active);
 
         if (start != null) {
@@ -154,14 +147,12 @@ public class BridgeEmitterTileEntity
         }
 
         if (direction != null) {
-            tag.putDouble("dirX", direction.x);
-            tag.putDouble("dirY", direction.y);
-            tag.putDouble("dirZ", direction.z);
+            tag.putInt("direction", direction.get3DDataValue());
         }
 
-        tag.putFloat("roll", roll);
-
-        /* ---- Bridge Data ---- */
+        if (up != null) {
+            tag.putInt("up", up.get3DDataValue());
+        }
 
         if (bridge != null) {
             tag.put("bridge", bridge.toNBT());
@@ -171,8 +162,6 @@ public class BridgeEmitterTileEntity
     }
 
     private void readEmitterData(CompoundNBT tag) {
-
-        /* ---- Basic State Data ---- */
 
         if (tag.contains("active")) {
             active = tag.getBoolean("active");
@@ -186,17 +175,13 @@ public class BridgeEmitterTileEntity
                     tag.getDouble("startZ"));
         }
 
-        if (tag.contains("dirX")) {
-
-            direction = new Vector3d(
-                    tag.getDouble("dirX"),
-                    tag.getDouble("dirY"),
-                    tag.getDouble("dirZ"));
+        if (tag.contains("direction")) {
+            direction = Direction.from3DDataValue(tag.getInt("direction"));
         }
 
-        roll = tag.getFloat("roll");
-
-        /* ---- Bridge Data ---- */
+        if (tag.contains("up")) {
+            up = Direction.from3DDataValue(tag.getInt("up"));
+        }
 
         if (tag.contains("bridge")) {
             bridge = BridgeDTO.fromNBT(tag.getCompound("bridge"));
@@ -214,8 +199,7 @@ public class BridgeEmitterTileEntity
     }
 
     @Override
-    public void load(BlockState state,
-            CompoundNBT tag) {
+    public void load(BlockState state, CompoundNBT tag) {
 
         super.load(state, tag);
 
@@ -236,9 +220,7 @@ public class BridgeEmitterTileEntity
     }
 
     @Override
-    public void onDataPacket(NetworkManager net,
-            SUpdateTileEntityPacket pkt) {
-
+    public void onDataPacket(NetworkManager net, SUpdateTileEntityPacket pkt) {
         readEmitterData(pkt.getTag());
     }
 
@@ -251,9 +233,7 @@ public class BridgeEmitterTileEntity
     }
 
     @Override
-    public void handleUpdateTag(BlockState state,
-            CompoundNBT tag) {
-
+    public void handleUpdateTag(BlockState state, CompoundNBT tag) {
         readEmitterData(tag);
     }
 
@@ -262,9 +242,7 @@ public class BridgeEmitterTileEntity
     @Override
     public AxisAlignedBB getRenderBoundingBox() {
 
-        if (bridge == null ||
-                bridge.getSegments().isEmpty()) {
-
+        if (bridge == null || bridge.getSegments().isEmpty()) {
             return super.getRenderBoundingBox();
         }
 
@@ -281,23 +259,13 @@ public class BridgeEmitterTileEntity
             Vector3d start = segment.getStart();
             Vector3d end = segment.getEnd();
 
-            minX = Math.min(minX,
-                    Math.min(start.x, end.x));
+            minX = Math.min(minX, Math.min(start.x, end.x));
+            minY = Math.min(minY, Math.min(start.y, end.y));
+            minZ = Math.min(minZ, Math.min(start.z, end.z));
 
-            minY = Math.min(minY,
-                    Math.min(start.y, end.y));
-
-            minZ = Math.min(minZ,
-                    Math.min(start.z, end.z));
-
-            maxX = Math.max(maxX,
-                    Math.max(start.x, end.x));
-
-            maxY = Math.max(maxY,
-                    Math.max(start.y, end.y));
-
-            maxZ = Math.max(maxZ,
-                    Math.max(start.z, end.z));
+            maxX = Math.max(maxX, Math.max(start.x, end.x));
+            maxY = Math.max(maxY, Math.max(start.y, end.y));
+            maxZ = Math.max(maxZ, Math.max(start.z, end.z));
         }
 
         return new AxisAlignedBB(
@@ -306,6 +274,7 @@ public class BridgeEmitterTileEntity
                 minZ,
                 maxX,
                 maxY,
-                maxZ).inflate(1.0);
+                maxZ)
+                .inflate(1.0);
     }
 }
